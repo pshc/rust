@@ -846,19 +846,7 @@ pub fn build_session_options(matches: &getopts::Matches) -> Options {
     let crate_types = parse_crate_types_from_list(unparsed_crate_types)
         .unwrap_or_else(|e| early_error(&e[]));
 
-    let mut lint_opts = vec!();
-    let mut describe_lints = false;
-
-    for &level in [lint::Allow, lint::Warn, lint::Deny, lint::Forbid].iter() {
-        for lint_name in matches.opt_strs(level.as_str()).into_iter() {
-            if lint_name == "help" {
-                describe_lints = true;
-            } else {
-                lint_opts.push((lint_name.replace("-", "_"), level));
-            }
-        }
-    }
-
+    let (lint_opts, describe_lints) = build_lint_options(matches);
     let debugging_opts = build_debugging_options(matches);
 
     let parse_only = if matches.opt_present("parse-only") {
@@ -1134,6 +1122,24 @@ pub fn build_session_options(matches: &getopts::Matches) -> Options {
         libs: libs,
         unstable_features: UnstableFeatures::Disallow
     }
+}
+
+/// The second return value indicates whether or not `matches` included "help".
+pub fn build_lint_options(matches: &getopts::Matches) -> (Vec<(String, lint::Level)>, bool) {
+    let mut lint_opts = vec![];
+    let mut describe_lints = false;
+
+    for &level in [lint::Allow, lint::Warn, lint::Deny, lint::Forbid].iter() {
+        for lint_name in matches.opt_strs(level.as_str()).into_iter() {
+            if lint_name == "help" {
+                describe_lints = true;
+            } else {
+                lint_opts.push((lint_name.replace("-", "_"), level));
+            }
+        }
+    }
+
+    (lint_opts, describe_lints)
 }
 
 pub fn parse_crate_types_from_list(list_list: Vec<String>) -> Result<Vec<CrateType>, String> {

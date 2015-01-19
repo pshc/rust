@@ -43,6 +43,7 @@ use std::rc::Rc;
 use externalfiles::ExternalHtml;
 use serialize::Decodable;
 use serialize::json::{self, Json};
+use rustc::{lint, session};
 use rustc::session::search_paths::SearchPaths;
 
 // reexported from `clean` so it can be easily updated with the mod itself
@@ -139,6 +140,10 @@ pub fn opts() -> Vec<getopts::OptGroup> {
         optflag("", "test", "run code examples as tests"),
         optmulti("", "test-args", "arguments to pass to the test runner",
                  "ARGS"),
+        optmulti("W", "warn", "warn about lint during doctests", "OPT"),
+        optmulti("A", "allow", "allow lint during doctests", "OPT"),
+        optmulti("D", "deny", "deny lint during doctests", "OPT"),
+        optmulti("F", "forbid", "forbid lint during doctests", "OPT"),
         optopt("", "target", "target triple to document", "TRIPLE"),
         optmulti("", "markdown-css", "CSS files to include via <link> in a rendered Markdown file",
                  "FILES"),
@@ -157,7 +162,6 @@ pub fn opts() -> Vec<getopts::OptGroup> {
         optopt("", "markdown-playground-url",
                "URL to send code snippets to", "URL"),
         optflag("", "markdown-no-toc", "don't include table of contents"),
-        optflag("", "deny-doctest-warnings", "fail to compile on warnings in doc tests")
     )
 }
 
@@ -193,6 +197,26 @@ pub fn main_args(args: &[String]) -> int {
             println!("{:>20}", name);
         }
         return 0;
+    }
+
+    let (lint_opts, describe_lints) = session::config::build_lint_options(&matches);
+    if describe_lints {
+        println!("
+Available doctest lint options:
+    - D warnings       Deny warnings during doctests
+");
+        return 0;
+    }
+
+    let mut deny_warnings = false;
+    for opt in lint_opts.iter() {
+        match opt {
+            &(ref s, lint::Deny) if *s == "warnings" => deny_warnings = true,
+            _ => {
+                println!("Currently, only the `warnings` lint can be denied.");
+                return 1;
+            }
+        }
     }
 
     if matches.free.len() == 0 {
@@ -236,7 +260,6 @@ pub fn main_args(args: &[String]) -> int {
         None => return 3
     };
     let crate_name = matches.opt_str("crate-name");
-    let deny_warnings = matches.opt_present("deny-doctest-warnings");
 
     match (should_test, markdown_input) {
         (true, true) => {
